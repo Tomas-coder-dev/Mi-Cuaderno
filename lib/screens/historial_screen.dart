@@ -4,6 +4,7 @@ import '../models/paquete.dart';
 import '../providers/paquete_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart' as du;
+import '../utils/grupos_envio.dart';
 import '../widgets/barra_superior_navegacion.dart';
 import '../widgets/tarjeta_historial.dart';
 
@@ -46,11 +47,7 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
 
     final query = busqueda.trim().toLowerCase();
     if (query.isNotEmpty) {
-      resultado = resultado
-          .where((p) =>
-              p.numero.toLowerCase().contains(query) ||
-              p.descripcion.toLowerCase().contains(query))
-          .toList();
+      resultado = resultado.where((p) => p.coincideCon(query)).toList();
     }
 
     return resultado;
@@ -59,6 +56,7 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
   @override
   Widget build(BuildContext context) {
     final enviados = ref.watch(paquetesEnviadosProvider);
+    final viajes = ref.watch(viajesProvider).valueOrNull ?? [];
     final filtro = ref.watch(filtroHistorialProvider);
     final busqueda = ref.watch(busquedaHistorialProvider);
     final totalEnviados = enviados.valueOrNull?.length ?? 0;
@@ -188,14 +186,22 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
                       );
                     }
 
-                    return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (ctx, i) => TarjetaHistorial(
-                          paquete: filtrada[i],
-                          index: i,
-                        ),
-                        childCount: filtrada.length,
-                      ),
+                    final grupos = agruparEnvios(filtrada, viajes);
+                    final hayEnviosAgrupados = grupos.any((grupo) => !grupo.suelto);
+
+                    return SliverMainAxisGroup(
+                      slivers: [
+                        for (final grupo in grupos) ...[
+                          if (!grupo.suelto || hayEnviosAgrupados)
+                            SliverToBoxAdapter(child: _TituloGrupo(grupo: grupo)),
+                          SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) => TarjetaHistorial(paquete: grupo.paquetes[i], index: i),
+                              childCount: grupo.paquetes.length,
+                            ),
+                          ),
+                        ],
+                      ],
                     );
                   },
                   loading: () => const SliverFillRemaining(
@@ -212,6 +218,31 @@ class _HistorialScreenState extends ConsumerState<HistorialScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TituloGrupo extends StatelessWidget {
+  final GrupoEnvio grupo;
+  const _TituloGrupo({required this.grupo});
+
+  @override
+  Widget build(BuildContext context) {
+    final cantidad = grupo.paquetes.length;
+    final cuando = du.DateUtils.isToday(grupo.fecha)
+        ? 'Hoy ${du.DateUtils.formatTime(grupo.fecha)}'
+        : du.DateUtils.formatFull(grupo.fecha);
+    final nota = grupo.viaje?.nota.trim() ?? '';
+    final titulo = grupo.suelto
+        ? 'Salidas sin agrupar'
+        : '$cuando${nota.isEmpty ? '' : ' · $nota'}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Text(
+        '$titulo · $cantidad',
+        style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.history, fontSize: 14),
       ),
     );
   }

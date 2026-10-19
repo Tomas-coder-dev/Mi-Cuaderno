@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/paquete.dart';
 import '../providers/paquete_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/date_utils.dart' as du;
+import 'ajustes_screen.dart';
 import 'home_shell.dart';
 
 class InicioScreen extends ConsumerWidget {
@@ -10,8 +13,19 @@ class InicioScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final enAlmacen = ref.watch(paquetesEnAlmacenProvider).valueOrNull?.length ?? 0;
-    final enviados = ref.watch(paquetesEnviadosProvider).valueOrNull?.length ?? 0;
+    final enAlmacenLista = ref.watch(paquetesEnAlmacenProvider).valueOrNull ?? [];
+    final enviadosLista = ref.watch(paquetesEnviadosProvider).valueOrNull ?? [];
+    final enAlmacen = enAlmacenLista.length;
+    final enviados = enviadosLista.length;
+    Paquete? masAntiguo;
+    for (final paquete in enAlmacenLista) {
+      final actual = masAntiguo;
+      if (actual == null || paquete.fechaLlegada.isBefore(actual.fechaLlegada)) {
+        masAntiguo = paquete;
+      }
+    }
+
+    final destacado = masAntiguo;
 
     return Center(
       child: ConstrainedBox(
@@ -140,6 +154,15 @@ class InicioScreen extends ConsumerWidget {
                 ),
               ).animate().fadeIn(duration: 250.ms).slideY(begin: -0.05),
 
+              if (destacado != null && destacado.diasEnLocal() >= 1) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'El más antiguo: ${destacado.codigoVisible} · ${du.DateUtils.textoEnLocal(destacado.diasEnLocal())}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.sentDark),
+                ),
+              ],
+
               const SizedBox(height: 24),
               const Center(
                 child: Text(
@@ -166,7 +189,7 @@ class InicioScreen extends ConsumerWidget {
                   _BotonCuadrado(
                     titulo: 'PAQUETES\nEN LOCAL',
                     subtitulo: '$enAlmacen en espera',
-                    descripcion: 'Llegaron y se anotan aquí',
+                    descripcion: 'Ver y anotar paquetes',
                     icono: Icons.inventory_2_rounded,
                     colorPrincipal: AppTheme.inStock,
                     colorFondo: AppTheme.inStockLight,
@@ -215,6 +238,15 @@ class InicioScreen extends ConsumerWidget {
                   ),
                 ],
               ).animate().fadeIn(delay: 100.ms, duration: 300.ms).scale(begin: const Offset(0.96, 0.96)),
+
+              const SizedBox(height: 18),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AjustesScreen()));
+                },
+                icon: const Icon(Icons.settings_rounded),
+                label: const Text('Ajustes del cuaderno', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
 
               const SizedBox(height: 28),
             ],

@@ -1,10 +1,7 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// Adapter escrito a mano para conservar los registros viejos (campos 0 a 4).
 
 part of 'paquete.dart';
-
-// **************************************************************************
-// TypeAdapterGenerator
-// **************************************************************************
 
 class PaqueteAdapter extends TypeAdapter<Paquete> {
   @override
@@ -19,16 +16,20 @@ class PaqueteAdapter extends TypeAdapter<Paquete> {
     return Paquete(
       id: fields[0] as String,
       numero: fields[1] as String,
-      descripcion: fields[2] as String,
+      descripcion: fields[2] as String? ?? '',
       fechaLlegada: fields[3] as DateTime,
       fechaEnvio: fields[4] as DateTime?,
+      destinatario: fields[5] as String? ?? '',
+      telefono: fields[6] as String? ?? '',
+      viajeId: fields[7] as String?,
+      fotoPath: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Paquete obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +39,15 @@ class PaqueteAdapter extends TypeAdapter<Paquete> {
       ..writeByte(3)
       ..write(obj.fechaLlegada)
       ..writeByte(4)
-      ..write(obj.fechaEnvio);
+      ..write(obj.fechaEnvio)
+      ..writeByte(5)
+      ..write(obj.destinatario)
+      ..writeByte(6)
+      ..write(obj.telefono)
+      ..writeByte(7)
+      ..write(obj.viajeId)
+      ..writeByte(8)
+      ..write(obj.fotoPath);
   }
 
   @override

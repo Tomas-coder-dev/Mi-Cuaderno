@@ -5,6 +5,7 @@ import '../providers/paquete_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/barra_superior_navegacion.dart';
 import '../widgets/tarjeta_paquete.dart';
+import 'anotar_paquetes_screen.dart';
 import 'home_shell.dart';
 
 class InventarioScreen extends ConsumerStatefulWidget {
@@ -23,133 +24,21 @@ class _InventarioScreenState extends ConsumerState<InventarioScreen> {
     super.dispose();
   }
 
-  void _abrirModalIngreso(BuildContext context) {
-    final codigoCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.divider,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Anotar Paquete que Llegó',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Escribe el código del paquete y para quién es.',
-                    style: TextStyle(fontSize: 14, color: AppTheme.textMedium),
-                  ),
-                  const SizedBox(height: 20),
-                  // Código
-                  const Text(
-                    'Código del Paquete',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textDark),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: codigoCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-                    decoration: const InputDecoration(
-                      hintText: 'Ej: FZ30, GUIA-102, B22...',
-                      prefixIcon: Icon(Icons.tag_rounded, color: AppTheme.inStock, size: 24),
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Escribe el código del paquete' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  // Descripción
-                  const Text(
-                    '¿Para quién es o qué contiene?',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textDark),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: descCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    decoration: const InputDecoration(
-                      hintText: 'Ej: Ropa de Doña Carmen, caja de zapatos...',
-                      prefixIcon: Padding(
-                        padding: EdgeInsets.only(bottom: 24),
-                        child: Icon(Icons.description_rounded, color: AppTheme.inStock, size: 24),
-                      ),
-                      alignLabelWithHint: true,
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Escribe para quién es o el contenido' : null,
-                  ),
-                  const SizedBox(height: 24),
-                  // Botón Guardar
-                  SizedBox(
-                    height: 54,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.inStock),
-                      onPressed: () async {
-                        if (!formKey.currentState!.validate()) return;
-                        final codigo = codigoCtrl.text.trim().toUpperCase();
-                        final desc = descCtrl.text.trim();
-
-                        await ref.read(paqueteRepositoryProvider.notifier).agregarPaquete(
-                              numero: codigo,
-                              descripcion: desc,
-                            );
-
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Paquete #$codigo anotado en el almacén'),
-                              backgroundColor: AppTheme.inStock,
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle_rounded, size: 22),
-                      label: const Text('Guardar en Almacén', style: TextStyle(fontWeight: FontWeight.w900)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+  Future<void> _abrirAnotar(BuildContext context) async {
+    final guardados = await Navigator.of(context).push<int>(
+      MaterialPageRoute(builder: (_) => const AnotarPaquetesScreen()),
+    );
+    if (guardados == null || guardados <= 0 || !context.mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          guardados == 1 ? '1 paquete anotado en el almacén' : '$guardados paquetes anotados en el almacén',
         ),
+        backgroundColor: AppTheme.inStock,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -205,7 +94,7 @@ class _InventarioScreenState extends ConsumerState<InventarioScreen> {
                             child: SizedBox(
                               height: 52,
                               child: ElevatedButton.icon(
-                                onPressed: () => _abrirModalIngreso(context),
+                                onPressed: () => _abrirAnotar(context),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.inStock,
                                   elevation: 2,
@@ -213,7 +102,7 @@ class _InventarioScreenState extends ConsumerState<InventarioScreen> {
                                 ),
                                 icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
                                 label: const Text(
-                                  'Anotar Paquete',
+                                  'Anotar paquetes',
                                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                                 ),
                               ),
@@ -334,10 +223,10 @@ class _InventarioScreenState extends ConsumerState<InventarioScreen> {
                                 SizedBox(
                                   height: 54,
                                   child: ElevatedButton.icon(
-                                    onPressed: () => _abrirModalIngreso(context),
+                                    onPressed: () => _abrirAnotar(context),
                                     icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
                                     label: const Text(
-                                      'Anotar Paquete que Llegó',
+                                      'Anotar paquetes nuevos',
                                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                                     ),
                                     style: ElevatedButton.styleFrom(

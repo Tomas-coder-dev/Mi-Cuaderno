@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/paquete.dart';
-import '../providers/paquete_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart' as du;
+import '../utils/eliminar_paquete.dart';
+import 'miniatura_foto.dart';
 
 class TarjetaHistorial extends ConsumerWidget {
   final Paquete paquete;
@@ -15,43 +16,6 @@ class TarjetaHistorial extends ConsumerWidget {
     required this.paquete,
     required this.index,
   });
-
-  void _confirmarRevertir(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('¿Regresar al almacén?'),
-        content: Text(
-          'El paquete #${paquete.numero} volverá a aparecer en la lista de paquetes pendientes en el almacén.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.inStock),
-            onPressed: () {
-              ref.read(paqueteRepositoryProvider.notifier).revertirAAlmacen(paquete.id);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Paquete #${paquete.numero} regresado al almacén'),
-                  backgroundColor: AppTheme.inStock,
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              );
-            },
-            child: const Text('Sí, regresar'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _mostrarDetalles(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
@@ -129,7 +93,7 @@ class TarjetaHistorial extends ConsumerWidget {
                               ),
                               SizedBox(width: 4),
                               Text(
-                                'YA SALIÓ / ENVIADO',
+                                'ENVIADO',
                                 style: TextStyle(
                                   color: AppTheme.sent,
                                   fontWeight: FontWeight.w800,
@@ -139,19 +103,11 @@ class TarjetaHistorial extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          tooltip: 'Regresar al almacén',
-                          icon: const Icon(Icons.undo_rounded, size: 20, color: AppTheme.textLight),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _confirmarRevertir(context, ref),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      paquete.descripcion,
+                      paquete.paraQuien.isEmpty ? paquete.descripcion : paquete.paraQuien,
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppTheme.textMedium,
@@ -270,7 +226,7 @@ class _DetalleHistorialSheet extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Text(
-                    'YA SALIÓ / ENVIADO',
+                    'ENVIADO',
                     style: TextStyle(
                       color: AppTheme.sent,
                       fontWeight: FontWeight.w800,
@@ -282,100 +238,105 @@ class _DetalleHistorialSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Descripción / Para quién es:',
+              'Para quién es:',
               style: TextStyle(fontSize: 13, color: AppTheme.textLight, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
-              paquete.descripcion,
+              paquete.paraQuien.isEmpty ? paquete.descripcion : paquete.paraQuien,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark),
             ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.login_rounded, size: 16, color: AppTheme.inStock),
-                const SizedBox(width: 8),
-                Text(
-                  'Llegó al almacén: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textMedium, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            if (paquete.fechaEnvio != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.local_shipping_rounded, size: 16, color: AppTheme.sent),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Salió / Enviado: ${du.DateUtils.formatFull(paquete.fechaEnvio!)}',
-                    style: const TextStyle(fontSize: 13, color: AppTheme.textMedium, fontWeight: FontWeight.w600),
-                  ),
-                ],
+            if (paquete.detalle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                paquete.detalle,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMedium),
               ),
             ],
-            const SizedBox(height: 24),
-            Row(
+            if (paquete.fotoPath != null) ...[
+              const SizedBox(height: 12),
+              MiniaturaFoto(path: paquete.fotoPath, size: 96),
+            ],
+            const SizedBox(height: 14),
+            // Fechas con chips visuales
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.inStock,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () {
-                      ref.read(paqueteRepositoryProvider.notifier).revertirAAlmacen(paquete.id);
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).clearSnackBars();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('✅ Paquete #${paquete.numero} regresado al almacén'),
-                          backgroundColor: AppTheme.inStock,
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.undo_rounded),
-                    label: const Text('Regresar al Almacén'),
-                  ),
+                _fechaChip(
+                  Icons.login_rounded,
+                  'Llegó: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
+                  AppTheme.inStockLight,
+                  AppTheme.inStock,
                 ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.danger,
-                    side: const BorderSide(color: AppTheme.danger),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                if (paquete.fechaEnvio != null)
+                  _fechaChip(
+                    Icons.local_shipping_rounded,
+                    'Salió: ${du.DateUtils.formatFull(paquete.fechaEnvio!)}',
+                    AppTheme.sentLight,
+                    AppTheme.sent,
                   ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      builder: (dialogCtx) => AlertDialog(
-                        title: const Text('¿Eliminar del historial?'),
-                        content: Text('Se eliminará el paquete #${paquete.numero}.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancelar')),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-                            onPressed: () {
-                              ref.read(paqueteRepositoryProvider.notifier).eliminarPaquete(paquete.id);
-                              Navigator.pop(dialogCtx);
-                            },
-                            child: const Text('Eliminar'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  label: const Text('Eliminar'),
-                ),
               ],
+            ),
+            const SizedBox(height: 24),
+            // Solo botón eliminar con confirmación
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.danger,
+                  side: const BorderSide(color: AppTheme.danger),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => AlertDialog(
+                      title: const Text('¿Eliminar del historial?'),
+                      content: Text('Se eliminará el paquete #${paquete.numero}.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancelar')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+                          onPressed: () {
+                            Navigator.pop(dialogCtx);
+                            eliminarConDeshacer(context, ref, paquete.id);
+                          },
+                          child: const Text('Eliminar'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Eliminar del historial', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _fechaChip(IconData icon, String text, Color bg, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
