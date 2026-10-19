@@ -1,406 +1,238 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/paquete.dart';
 import '../providers/paquete_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart' as du;
+import '../utils/eliminar_paquete.dart';
+import '../utils/foto_archivo.dart';
+import 'miniatura_foto.dart';
 
 class TarjetaPaquete extends ConsumerWidget {
   final Paquete paquete;
-  final VoidCallback? onDismissed;
 
-  const TarjetaPaquete({
-    super.key,
-    required this.paquete,
-    this.onDismissed,
-  });
+  const TarjetaPaquete({super.key, required this.paquete});
 
-  void _abrirEditar(BuildContext context, WidgetRef ref) {
-    final numCtrl = TextEditingController(text: paquete.numero);
-    final descCtrl = TextEditingController(text: paquete.descripcion);
+  Future<void> _abrirEditar(BuildContext context, WidgetRef ref) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _DialogoEditarPaquete(paquete: paquete),
+    );
+  }
 
-    showDialog(
+  Future<void> _confirmarEliminar(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('✏️ Editar Paquete', style: TextStyle(fontWeight: FontWeight.w800)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 26),
+            SizedBox(width: 10),
+            Text('¿Eliminar paquete?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: numCtrl,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Código del Paquete',
-                prefixIcon: Icon(Icons.tag_rounded),
-              ),
+            const Text(
+              '¿Seguro que deseas quitar este paquete del cuaderno?',
+              style: TextStyle(fontSize: 15, color: AppTheme.textDark, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Descripción / Para quién es',
-                prefixIcon: Icon(Icons.description_rounded),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.dangerLight,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.danger.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.inventory_2_rounded, color: AppTheme.danger, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          paquete.codigoVisible,
+                          style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.dangerDark, fontSize: 16),
+                        ),
+                        if (paquete.paraQuien.isNotEmpty)
+                          Text(
+                            paquete.paraQuien,
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textDark, fontSize: 14),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, cancelar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.textMedium)),
           ),
-          ElevatedButton(
-            onPressed: () {
-              if (numCtrl.text.trim().isNotEmpty && descCtrl.text.trim().isNotEmpty) {
-                ref.read(paqueteRepositoryProvider.notifier).editarPaquete(
-                  id: paquete.id,
-                  numero: numCtrl.text.trim().toUpperCase(),
-                  descripcion: descCtrl.text.trim(),
-                );
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Guardar'),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_rounded, size: 18),
+            label: const Text('Sí, eliminar', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
           ),
         ],
       ),
     );
-  }
-
-  void _confirmarEliminar(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('¿Eliminar paquete?'),
-        content: Text('Se eliminará del almacén el paquete #${paquete.numero}.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-            onPressed: () {
-              ref.read(paqueteRepositoryProvider.notifier).eliminarPaquete(paquete.id);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _mostrarOpciones(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _DetallePaqueteSheet(
-        paquete: paquete,
-        onEditar: () => _abrirEditar(context, ref),
-        onEliminar: () => _confirmarEliminar(context, ref),
-      ),
-    );
+    if (ok == true && context.mounted) {
+      await eliminarConDeshacer(context, ref, paquete.id);
+    }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return InkWell(
-      onTap: () => _mostrarOpciones(context, ref),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppTheme.cardBg,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(color: AppTheme.divider, width: 1.2),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Fila de código y badge de almacén ──
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.inventory_2_rounded,
-                          color: AppTheme.primary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          paquete.numero.startsWith('#') ? paquete.numero : '#${paquete.numero}',
-                          style: const TextStyle(
-                            color: AppTheme.primaryDark,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 17,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  // Badge claro que está en almacén
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.inStockLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.inStock.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.home_work_rounded,
-                          color: AppTheme.inStock,
-                          size: 15,
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          'EN ALMACÉN',
-                          style: TextStyle(
-                            color: AppTheme.inStock,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // ── Descripción o para quién es ──
-              Text(
-                paquete.descripcion,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textDark,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 10),
-
-              // ── Fecha en que llegó al almacén ──
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.login_rounded,
-                      size: 16,
-                      color: AppTheme.inStock,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Llegó / Registrado: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textMedium,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // ── Botones de acciones rápidas (Editar y Eliminar) ──
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _abrirEditar(context, ref),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textDark,
-                        side: const BorderSide(color: AppTheme.divider, width: 1.2),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.edit_rounded, size: 16, color: AppTheme.textMedium),
-                      label: const Text('Editar', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _confirmarEliminar(context, ref),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.danger,
-                        side: BorderSide(color: AppTheme.danger.withValues(alpha: 0.3), width: 1.2),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.danger),
-                      label: const Text('Eliminar', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 250.ms)
-        .slideY(begin: 0.05, end: 0, duration: 250.ms, curve: Curves.easeOut);
-  }
-}
-
-class _DetallePaqueteSheet extends StatelessWidget {
-  final Paquete paquete;
-  final VoidCallback onEditar;
-  final VoidCallback onEliminar;
-
-  const _DetallePaqueteSheet({
-    required this.paquete,
-    required this.onEditar,
-    required this.onEliminar,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+    final dias = paquete.diasEnLocal();
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.divider, width: 1.2),
       ),
-      child: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
-                Text(
-                  paquete.numero.startsWith('#') ? paquete.numero : '#${paquete.numero}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.textDark,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    paquete.codigoVisible,
+                    style: const TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w900, fontSize: 17),
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.inStockLight,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.inStock.withValues(alpha: 0.3)),
-                  ),
-                  child: const Text(
-                    '📦 EN ALMACÉN',
-                    style: TextStyle(
-                      color: AppTheme.inStock,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
+                // ── Botón Editar con icono y texto claro ──
+                Material(
+                  color: AppTheme.accentLight,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => _abrirEditar(context, ref),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_rounded, size: 16, color: AppTheme.accent),
+                          SizedBox(width: 4),
+                          Text(
+                            'Editar',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.accent,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Descripción / Para quién es:',
-              style: TextStyle(fontSize: 13, color: AppTheme.textLight, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              paquete.descripcion,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.login_rounded, size: 18, color: AppTheme.inStock),
                 const SizedBox(width: 8),
-                Text(
-                  'Llegó al almacén: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
-                  style: const TextStyle(fontSize: 14, color: AppTheme.textMedium, fontWeight: FontWeight.w600),
+                // ── Botón Eliminar con icono y texto claro ──
+                Material(
+                  color: AppTheme.dangerLight,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => _confirmarEliminar(context, ref),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.25)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.danger),
+                          SizedBox(width: 4),
+                          Text(
+                            'Eliminar',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.danger,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            Text(
+              paquete.paraQuien.isEmpty ? 'Sin nombre' : paquete.paraQuien,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+            ),
+            if (paquete.detalle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                paquete.detalle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMedium),
+              ),
+            ],
+            if (paquete.telefono.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                paquete.telefono.trim(),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textMedium),
+              ),
+            ],
+            const SizedBox(height: 10),
             Row(
               children: [
+                MiniaturaFoto(path: paquete.fotoPath),
+                if (paquete.fotoPath != null) const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onEditar();
-                    },
-                    icon: const Icon(Icons.edit_rounded),
-                    label: const Text('Editar'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.danger,
-                      side: const BorderSide(color: AppTheme.danger),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: dias >= 1 ? AppTheme.sentLight : AppTheme.inStockLight,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onEliminar();
-                    },
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    label: const Text('Eliminar'),
+                    child: Text(
+                      '${du.DateUtils.textoEnLocal(dias)} · ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: dias >= 1 ? AppTheme.sentDark : AppTheme.inStock,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -408,6 +240,197 @@ class _DetallePaqueteSheet extends StatelessWidget {
           ],
         ),
       ),
+    ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.05, end: 0, duration: 250.ms);
+  }
+}
+
+class _DialogoEditarPaquete extends ConsumerStatefulWidget {
+  final Paquete paquete;
+  const _DialogoEditarPaquete({required this.paquete});
+
+  @override
+  ConsumerState<_DialogoEditarPaquete> createState() => _DialogoEditarPaqueteState();
+}
+
+class _DialogoEditarPaqueteState extends ConsumerState<_DialogoEditarPaquete> {
+  late final TextEditingController _codigo;
+  late final TextEditingController _persona;
+  late final TextEditingController _telefono;
+  late final TextEditingController _nota;
+  late String? _foto;
+  bool _fotoCambio = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.paquete;
+    _codigo = TextEditingController(text: p.numero);
+    _persona = TextEditingController(
+      text: p.destinatario.trim().isNotEmpty ? p.destinatario : p.descripcion,
+    );
+    _telefono = TextEditingController(text: p.telefono);
+    _nota = TextEditingController(
+      text: p.destinatario.trim().isNotEmpty ? p.descripcion : '',
+    );
+    _foto = p.fotoPath;
+  }
+
+  @override
+  void dispose() {
+    _codigo.dispose();
+    _persona.dispose();
+    _telefono.dispose();
+    _nota.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fotoNueva() async {
+    try {
+      final archivo = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1600);
+      if (archivo == null) return;
+      final path = await copiarFotoAlCuaderno(archivo.path);
+      if (!mounted) return;
+      if (path == null) {
+        setState(() => _error = 'La foto se guarda en el teléfono');
+        return;
+      }
+      setState(() {
+        _foto = path;
+        _fotoCambio = true;
+        _error = null;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _error = 'No pude abrir la foto');
+    }
+  }
+
+  Future<void> _guardar() async {
+    if (_codigo.text.trim().isEmpty || _persona.text.trim().isEmpty) {
+      setState(() => _error = 'Código y persona son obligatorios');
+      return;
+    }
+    final repo = ref.read(paqueteRepositoryProvider.notifier);
+    if (repo.codigoEnUso(_codigo.text, ignorarId: widget.paquete.id)) {
+      final seguir = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ese código ya existe'),
+          content: const Text('Hay otro paquete con el mismo código. ¿Lo guardas igual?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Revisar')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar igual')),
+          ],
+        ),
+      );
+      if (seguir != true) return;
+    }
+    await repo.editarPaquete(
+      id: widget.paquete.id,
+      numero: _codigo.text,
+      descripcion: _nota.text,
+      destinatario: _persona.text,
+      telefono: _telefono.text,
+      fotoPath: _foto,
+      actualizarFoto: _fotoCambio,
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: const Row(
+        children: [
+          Icon(Icons.edit_note_rounded, color: AppTheme.accent, size: 28),
+          SizedBox(width: 10),
+          Text('Editar paquete', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _codigo,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Código',
+                prefixIcon: Icon(Icons.tag_rounded, color: AppTheme.accent),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _persona,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: '¿Para quién es?',
+                prefixIcon: Icon(Icons.person_rounded, color: AppTheme.accent),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _telefono,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Teléfono (opcional)',
+                prefixIcon: Icon(Icons.phone_rounded, color: AppTheme.accent),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _nota,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Qué contiene (opcional)',
+                prefixIcon: Icon(Icons.notes_rounded, color: AppTheme.accent),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                MiniaturaFoto(path: _foto, size: 48),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _fotoNueva,
+                  icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                  label: Text(_foto == null ? 'Foto' : 'Cambiar'),
+                ),
+                if (_foto != null) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    onPressed: () => setState(() {
+                      _foto = null;
+                      _fotoCambio = true;
+                    }),
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger),
+                  ),
+                ],
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w800)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar', style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textMedium)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          onPressed: _guardar,
+          child: const Text('Guardar cambios', style: TextStyle(fontWeight: FontWeight.w900)),
+        ),
+      ],
     );
   }
 }

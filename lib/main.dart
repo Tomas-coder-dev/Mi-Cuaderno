@@ -5,23 +5,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'models/paquete.dart';
-import 'theme/app_theme.dart';
+import 'models/viaje.dart';
+import 'providers/ajustes_provider.dart';
 import 'screens/home_shell.dart';
+import 'theme/app_theme.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Spanish locale for dates
   await initializeDateFormatting('es', null);
 
-  // Initialize Hive
   await Hive.initFlutter();
   if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(PaqueteAdapter());
   }
+  if (!Hive.isAdapterRegistered(1)) {
+    Hive.registerAdapter(ViajeAdapter());
+  }
   await Hive.openBox<Paquete>('paquetes');
+  await Hive.openBox<Viaje>('viajes');
+  await Hive.openBox(ajustesBoxName);
 
-  // Status bar styling
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -32,11 +35,11 @@ void main() async {
   runApp(const ProviderScope(child: PaqueteListoApp()));
 }
 
-class PaqueteListoApp extends StatelessWidget {
+class PaqueteListoApp extends ConsumerWidget {
   const PaqueteListoApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'PaqueteListo',
       debugShowCheckedModeBanner: false,

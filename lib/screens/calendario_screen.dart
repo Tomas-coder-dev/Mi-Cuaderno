@@ -8,8 +8,6 @@ import '../theme/app_theme.dart';
 import '../utils/date_utils.dart' as du;
 import '../widgets/barra_superior_navegacion.dart';
 
-final _rangeStartProvider = StateProvider<DateTime?>((ref) => null);
-final _rangeEndProvider = StateProvider<DateTime?>((ref) => null);
 final _selectedDayCalProvider = StateProvider<DateTime>((ref) {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day);
@@ -27,8 +25,6 @@ class CalendarioScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final paquetesAsync = ref.watch(paquetesProvider);
-    final rangeStart = ref.watch(_rangeStartProvider);
-    final rangeEnd = ref.watch(_rangeEndProvider);
     final selectedDay = ref.watch(_selectedDayCalProvider);
     final focusedDay = ref.watch(_focusedDayCalProvider);
     final tipoFiltro = ref.watch(_tipoFiltroCalProvider);
@@ -37,57 +33,63 @@ class CalendarioScreen extends ConsumerWidget {
       backgroundColor: AppTheme.background,
       body: Column(
         children: [
-          // ── Barra Superior Única (Sin doble botón de regresar) ──
+          // ── Barra Superior con botón rápido para ir a Hoy ──
           BarraSuperiorNavegacion(
-            titulo: 'Calendario y Fechas',
+            titulo: 'Calendario',
             icono: Icons.calendar_month_rounded,
             colorTema: AppTheme.accent,
-            accionDerecha: TextButton.icon(
-              onPressed: () {
-                final hoy = DateTime.now();
-                ref.read(_rangeStartProvider.notifier).state = null;
-                ref.read(_rangeEndProvider.notifier).state = null;
-                ref.read(_selectedDayCalProvider.notifier).state =
-                    DateTime(hoy.year, hoy.month, hoy.day);
-                ref.read(_focusedDayCalProvider.notifier).state = hoy;
-              },
-              icon: const Icon(Icons.today_rounded, size: 18),
-              label: const Text('Hoy', style: TextStyle(fontWeight: FontWeight.w800)),
-              style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
+            accionDerecha: Material(
+              color: AppTheme.accentLight,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: () {
+                  final hoy = DateTime.now();
+                  ref.read(_selectedDayCalProvider.notifier).state =
+                      DateTime(hoy.year, hoy.month, hoy.day);
+                  ref.read(_focusedDayCalProvider.notifier).state = hoy;
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.today_rounded, size: 18, color: AppTheme.accent),
+                      SizedBox(width: 6),
+                      Text(
+                        'Hoy',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.accent,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
 
-          // ── Contenido de la pantalla ──
+          // ── Contenido ──
           Expanded(
             child: paquetesAsync.when(
               data: (todos) {
-                // Filtrado según día único o rango de fechas
-                final bool esRango = rangeStart != null && rangeEnd != null;
-
-                bool fechaEnRango(DateTime dt) {
+                bool fechaCoincide(DateTime dt) {
                   final soloFecha = DateTime(dt.year, dt.month, dt.day);
-                  if (esRango) {
-                    final inicio = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
-                    final fin = DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day);
-                    return !soloFecha.isBefore(inicio) && !soloFecha.isAfter(fin);
-                  } else if (rangeStart != null) {
-                    return du.DateUtils.isSameDay(soloFecha, rangeStart);
-                  } else {
-                    return du.DateUtils.isSameDay(soloFecha, selectedDay);
-                  }
+                  return du.DateUtils.isSameDay(soloFecha, selectedDay);
                 }
 
-                // Paquetes que LLEGARON (Registrados) en esta fecha/rango
-                final paquetesLlegaron = todos.where((p) {
-                  return fechaEnRango(p.fechaLlegada);
-                }).toList();
+                // Paquetes que LLEGARON este día
+                final paquetesLlegaron =
+                    todos.where((p) => fechaCoincide(p.fechaLlegada)).toList();
 
-                // Paquetes que SALIERON (Enviados) en esta fecha/rango
-                final paquetesSalieron = todos.where((p) {
-                  return p.fechaEnvio != null && fechaEnRango(p.fechaEnvio!);
-                }).toList();
+                // Paquetes que SALIERON este día
+                final paquetesSalieron = todos
+                    .where((p) => p.fechaEnvio != null && fechaCoincide(p.fechaEnvio!))
+                    .toList();
 
-                // Todos los que tuvieron movimiento en esta fecha
+                // Todos los paquetes con movimiento en este día
                 final paquetesTodos = <String, Paquete>{};
                 for (final p in paquetesLlegaron) {
                   paquetesTodos[p.id] = p;
@@ -97,8 +99,8 @@ class CalendarioScreen extends ConsumerWidget {
                 }
                 final listaTodos = paquetesTodos.values.toList();
 
-                // Marcadores de actividad en el calendario
-                Map<DateTime, int> countPorDia = {};
+                // Conteo para los puntitos del calendario
+                final Map<DateTime, int> countPorDia = {};
                 for (final p in todos) {
                   final dLlegada = du.DateUtils.normalizeDay(p.fechaLlegada);
                   countPorDia[dLlegada] = (countPorDia[dLlegada] ?? 0) + 1;
@@ -123,10 +125,10 @@ class CalendarioScreen extends ConsumerWidget {
 
                 return CustomScrollView(
                   slivers: [
-                    // ── 1. PRIMERO: EL CALENDARIO (ARRIBA) ────────────────────
+                    // ── 1. CALENDARIO MENSUAL FÁCIL E INTUITIVO ──
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -140,174 +142,157 @@ class CalendarioScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Guía rápida compacta
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.accentLight,
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: TableCalendar<Paquete>(
+                              firstDay: DateTime(2020),
+                              lastDay: DateTime(2030),
+                              focusedDay: focusedDay,
+                              selectedDayPredicate: (day) =>
+                                  du.DateUtils.isSameDay(day, selectedDay),
+                              rangeSelectionMode: RangeSelectionMode.disabled,
+                              onDaySelected: (selected, focused) {
+                                ref.read(_selectedDayCalProvider.notifier).state = selected;
+                                ref.read(_focusedDayCalProvider.notifier).state = focused;
+                              },
+                              onPageChanged: (focused) =>
+                                  ref.read(_focusedDayCalProvider.notifier).state = focused,
+                              eventLoader: getEvents,
+                              locale: 'es_ES',
+                              startingDayOfWeek: StartingDayOfWeek.monday,
+                              calendarFormat: CalendarFormat.month,
+                              availableCalendarFormats: const {CalendarFormat.month: 'Mes'},
+                              rowHeight: 52,
+                              headerStyle: HeaderStyle(
+                                formatButtonVisible: false,
+                                titleCentered: true,
+                                titleTextStyle: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.textDark,
                                 ),
-                                child: Row(
-                                  children: const [
-                                    Icon(Icons.touch_app_rounded, color: AppTheme.accent, size: 18),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Toca un día o toca 2 días seguidos para marcar un rango',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppTheme.accent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              TableCalendar<Paquete>(
-                                firstDay: DateTime(2020),
-                                lastDay: DateTime(2030),
-                                focusedDay: focusedDay,
-                                selectedDayPredicate: (day) =>
-                                    rangeStart == null && du.DateUtils.isSameDay(day, selectedDay),
-                                rangeStartDay: rangeStart,
-                                rangeEndDay: rangeEnd,
-                                rangeSelectionMode: RangeSelectionMode.toggledOn,
-                                onRangeSelected: (start, end, focused) {
-                                  ref.read(_rangeStartProvider.notifier).state = start;
-                                  ref.read(_rangeEndProvider.notifier).state = end;
-                                  ref.read(_focusedDayCalProvider.notifier).state = focused;
-                                  if (start != null && end == null) {
-                                    ref.read(_selectedDayCalProvider.notifier).state = start;
-                                  }
-                                },
-                                onDaySelected: (selected, focused) {
-                                  ref.read(_rangeStartProvider.notifier).state = null;
-                                  ref.read(_rangeEndProvider.notifier).state = null;
-                                  ref.read(_selectedDayCalProvider.notifier).state = selected;
-                                  ref.read(_focusedDayCalProvider.notifier).state = focused;
-                                },
-                                onPageChanged: (focused) =>
-                                    ref.read(_focusedDayCalProvider.notifier).state = focused,
-                                eventLoader: getEvents,
-                                locale: 'es_ES',
-                                startingDayOfWeek: StartingDayOfWeek.monday,
-                                calendarFormat: CalendarFormat.month,
-                                availableCalendarFormats: const {CalendarFormat.month: 'Mes'},
-                                headerStyle: HeaderStyle(
-                                  formatButtonVisible: false,
-                                  titleCentered: true,
-                                  titleTextStyle: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.textDark,
+                                leftChevronIcon: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentLight,
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  leftChevronIcon: const Icon(
+                                  child: const Icon(
                                     Icons.chevron_left_rounded,
                                     color: AppTheme.accent,
                                     size: 26,
                                   ),
-                                  rightChevronIcon: const Icon(
+                                ),
+                                rightChevronIcon: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentLight,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
                                     Icons.chevron_right_rounded,
                                     color: AppTheme.accent,
                                     size: 26,
                                   ),
-                                  headerPadding: const EdgeInsets.symmetric(vertical: 10),
                                 ),
-                                daysOfWeekStyle: const DaysOfWeekStyle(
-                                  weekdayStyle: TextStyle(
-                                    color: AppTheme.textMedium,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                                  weekendStyle: TextStyle(
-                                    color: AppTheme.danger,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
+                                headerPadding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              daysOfWeekHeight: 34,
+                              daysOfWeekStyle: const DaysOfWeekStyle(
+                                weekdayStyle: TextStyle(
+                                  color: AppTheme.textMedium,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
                                 ),
-                                calendarStyle: CalendarStyle(
-                                  outsideDaysVisible: false,
-                                  defaultTextStyle: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textDark,
-                                    fontSize: 15,
-                                  ),
-                                  weekendTextStyle: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.danger,
-                                    fontSize: 15,
-                                  ),
-                                  todayDecoration: BoxDecoration(
-                                    color: AppTheme.accent.withValues(alpha: 0.18),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  todayTextStyle: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.accent,
-                                    fontSize: 15,
-                                  ),
-                                  selectedDecoration: const BoxDecoration(
-                                    color: AppTheme.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  rangeStartDecoration: const BoxDecoration(
-                                    color: AppTheme.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  rangeEndDecoration: const BoxDecoration(
-                                    color: AppTheme.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  rangeHighlightColor: AppTheme.accent.withValues(alpha: 0.16),
-                                  cellMargin: const EdgeInsets.all(3),
-                                ),
-                                calendarBuilders: CalendarBuilders(
-                                  markerBuilder: (context, day, events) {
-                                    if (events.isEmpty) return const SizedBox();
-                                    return Positioned(
-                                      bottom: 2,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 5,
-                                          vertical: 1,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.accent,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '${events.length}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                weekendStyle: TextStyle(
+                                  color: AppTheme.danger,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
                                 ),
                               ),
-                            ],
+                              calendarStyle: CalendarStyle(
+                                outsideDaysVisible: false,
+                                defaultTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textDark,
+                                  fontSize: 16,
+                                ),
+                                weekendTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.danger,
+                                  fontSize: 16,
+                                ),
+                                todayDecoration: BoxDecoration(
+                                  color: AppTheme.accentLight,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppTheme.accent, width: 2),
+                                ),
+                                todayTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.accent,
+                                  fontSize: 16,
+                                ),
+                                selectedDecoration: const BoxDecoration(
+                                  color: AppTheme.accent,
+                                  shape: BoxShape.circle,
+                                ),
+                                selectedTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                                cellMargin: const EdgeInsets.all(4),
+                              ),
+                              calendarBuilders: CalendarBuilders(
+                                markerBuilder: (context, day, events) {
+                                  if (events.isEmpty) return const SizedBox();
+                                  final isSel = du.DateUtils.isSameDay(day, selectedDay);
+                                  return Positioned(
+                                    bottom: 3,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSel ? Colors.white : AppTheme.accent,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '${events.length}',
+                                        style: TextStyle(
+                                          color: isSel ? AppTheme.accent : Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         ),
                       ).animate().fadeIn(duration: 250.ms),
                     ),
 
-                    // ── 2. SEGUNDO: DETALLE DE FECHAS SELECCIONADAS (ABAJO) ──
+                    // ── 2. DÍA SELECCIONADO Y PESTAÑAS CLARAS ──
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: AppTheme.divider, width: 1.3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,113 +300,82 @@ class CalendarioScreen extends ConsumerWidget {
                               Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: AppTheme.accentLight,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Text(
-                                      esRango ? 'RANGO SELECCIONADO' : 'FECHA SELECCIONADA',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppTheme.accent,
-                                      ),
+                                    child: const Icon(
+                                      Icons.event_note_rounded,
+                                      color: AppTheme.accent,
+                                      size: 22,
                                     ),
                                   ),
-                                  const Spacer(),
-                                  if (esRango)
-                                    TextButton(
-                                      onPressed: () {
-                                        ref.read(_rangeStartProvider.notifier).state = null;
-                                        ref.read(_rangeEndProvider.notifier).state = null;
-                                      },
-                                      child: const Text('Quitar rango', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          du.DateUtils.formatFriendly(selectedDay),
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.textDark,
+                                          ),
+                                        ),
+                                        if (du.DateUtils.isToday(selectedDay))
+                                          const Text(
+                                            'Hoy (día actual)',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppTheme.accent,
+                                            ),
+                                          ),
+                                      ],
                                     ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                esRango
-                                    ? 'Del ${du.DateUtils.formatDayMonth(rangeStart)} al ${du.DateUtils.formatDayMonth(rangeEnd)}'
-                                    : '${du.DateUtils.formatDayMonth(selectedDay)} (${du.DateUtils.formatDate(selectedDay)})',
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.textDark,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
 
-                              // Pestañas: Llegaron vs Salieron vs Todos
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    ChoiceChip(
-                                      label: Text('Llegaron (${paquetesLlegaron.length})'),
-                                      selected: tipoFiltro == TipoFiltroCalendario.llegaron,
-                                      onSelected: (_) => ref.read(_tipoFiltroCalProvider.notifier).state =
-                                          TipoFiltroCalendario.llegaron,
-                                      selectedColor: AppTheme.inStock,
-                                      backgroundColor: Colors.white,
-                                      side: BorderSide(
-                                        color: tipoFiltro == TipoFiltroCalendario.llegaron
-                                            ? AppTheme.inStock
-                                            : AppTheme.divider,
-                                      ),
-                                      labelStyle: TextStyle(
-                                        color: tipoFiltro == TipoFiltroCalendario.llegaron
-                                            ? Colors.white
-                                            : AppTheme.textDark,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ChoiceChip(
-                                      label: Text('Salieron (${paquetesSalieron.length})'),
-                                      selected: tipoFiltro == TipoFiltroCalendario.salieron,
-                                      onSelected: (_) => ref.read(_tipoFiltroCalProvider.notifier).state =
-                                          TipoFiltroCalendario.salieron,
-                                      selectedColor: AppTheme.sent,
-                                      backgroundColor: Colors.white,
-                                      side: BorderSide(
-                                        color: tipoFiltro == TipoFiltroCalendario.salieron
-                                            ? AppTheme.sent
-                                            : AppTheme.divider,
-                                      ),
-                                      labelStyle: TextStyle(
-                                        color: tipoFiltro == TipoFiltroCalendario.salieron
-                                            ? Colors.white
-                                            : AppTheme.textDark,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ChoiceChip(
-                                      label: Text('Todos (${listaTodos.length})'),
-                                      selected: tipoFiltro == TipoFiltroCalendario.todos,
-                                      onSelected: (_) => ref.read(_tipoFiltroCalProvider.notifier).state =
-                                          TipoFiltroCalendario.todos,
-                                      selectedColor: AppTheme.accent,
-                                      backgroundColor: Colors.white,
-                                      side: BorderSide(
-                                        color: tipoFiltro == TipoFiltroCalendario.todos
-                                            ? AppTheme.accent
-                                            : AppTheme.divider,
-                                      ),
-                                      labelStyle: TextStyle(
-                                        color: tipoFiltro == TipoFiltroCalendario.todos
-                                            ? Colors.white
-                                            : AppTheme.textDark,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              // Botones de filtro: Llegaron, Salieron, Todos
+                              Row(
+                                children: [
+                                  _FiltroTab(
+                                    label: 'Llegaron',
+                                    icono: Icons.inventory_2_rounded,
+                                    count: paquetesLlegaron.length,
+                                    color: AppTheme.inStock,
+                                    colorLight: AppTheme.inStockLight,
+                                    selected: tipoFiltro == TipoFiltroCalendario.llegaron,
+                                    onTap: () => ref.read(_tipoFiltroCalProvider.notifier).state =
+                                        TipoFiltroCalendario.llegaron,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _FiltroTab(
+                                    label: 'Salieron',
+                                    icono: Icons.local_shipping_rounded,
+                                    count: paquetesSalieron.length,
+                                    color: AppTheme.sent,
+                                    colorLight: AppTheme.sentLight,
+                                    selected: tipoFiltro == TipoFiltroCalendario.salieron,
+                                    onTap: () => ref.read(_tipoFiltroCalProvider.notifier).state =
+                                        TipoFiltroCalendario.salieron,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _FiltroTab(
+                                    label: 'Todos',
+                                    icono: Icons.checklist_rounded,
+                                    count: listaTodos.length,
+                                    color: AppTheme.accent,
+                                    colorLight: AppTheme.accentLight,
+                                    selected: tipoFiltro == TipoFiltroCalendario.todos,
+                                    onTap: () => ref.read(_tipoFiltroCalProvider.notifier).state =
+                                        TipoFiltroCalendario.todos,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -429,7 +383,7 @@ class CalendarioScreen extends ConsumerWidget {
                       ),
                     ),
 
-                    // ── 3. LISTA DE PAQUETES (CON ESTADO VISIBLE Y SIN BOTÓN ENVIAR) ──
+                    // ── 3. LISTADO DE PAQUETES ──
                     () {
                       final List<Paquete> lista = switch (tipoFiltro) {
                         TipoFiltroCalendario.llegaron => paquetesLlegaron,
@@ -438,31 +392,50 @@ class CalendarioScreen extends ConsumerWidget {
                       };
 
                       if (lista.isEmpty) {
+                        final String mensaje = switch (tipoFiltro) {
+                          TipoFiltroCalendario.salieron => 'No salió ningún paquete en esta fecha',
+                          TipoFiltroCalendario.llegaron => 'No llegó ningún paquete en esta fecha',
+                          TipoFiltroCalendario.todos => 'No hubo movimientos en esta fecha',
+                        };
+
                         return SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
                             child: Center(
                               child: Column(
                                 children: [
-                                  Icon(
-                                    tipoFiltro == TipoFiltroCalendario.salieron
-                                        ? Icons.local_shipping_outlined
-                                        : Icons.inventory_2_outlined,
-                                    size: 46,
-                                    color: AppTheme.textLight,
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.surfaceWarm,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      tipoFiltro == TipoFiltroCalendario.salieron
+                                          ? Icons.local_shipping_outlined
+                                          : Icons.inventory_2_outlined,
+                                      size: 38,
+                                      color: AppTheme.textLight,
+                                    ),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   Text(
-                                    tipoFiltro == TipoFiltroCalendario.salieron
-                                        ? 'No salió ningún paquete en esta fecha'
-                                        : tipoFiltro == TipoFiltroCalendario.llegaron
-                                            ? 'No llegó ningún paquete en esta fecha'
-                                            : 'No hay paquetes registrados en esta fecha',
+                                    mensaje,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Toca otro día en el calendario de arriba para ver sus paquetes',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
                                       color: AppTheme.textLight,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
@@ -493,6 +466,78 @@ class CalendarioScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FiltroTab extends StatelessWidget {
+  final String label;
+  final IconData icono;
+  final int count;
+  final Color color;
+  final Color colorLight;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FiltroTab({
+    required this.label,
+    required this.icono,
+    required this.count,
+    required this.color,
+    required this.colorLight,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: selected ? color : colorLight,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? color : color.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icono, size: 15, color: selected ? Colors.white : color),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: selected ? Colors.white : color,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white.withValues(alpha: 0.95) : color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -532,7 +577,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
               Row(
                 children: [
                   Text(
-                    paquete.numero.startsWith('#') ? paquete.numero : '#${paquete.numero}',
+                    paquete.codigoVisible,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
@@ -550,7 +595,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                       ),
                     ),
                     child: Text(
-                      paquete.enviado ? 'YA SALIÓ / ENVIADO' : 'EN ALMACÉN',
+                      paquete.enviado ? 'ENVIADO' : 'EN ALMACÉN',
                       style: TextStyle(
                         color: paquete.enviado ? AppTheme.sent : AppTheme.inStock,
                         fontWeight: FontWeight.w900,
@@ -562,50 +607,79 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Descripción / Para quién es:',
+                'Para quién es:',
                 style: TextStyle(fontSize: 13, color: AppTheme.textLight, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
-                paquete.descripcion,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                paquete.paraQuien.isEmpty ? 'Sin nombre' : paquete.paraQuien,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textDark),
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  const Icon(Icons.login_rounded, size: 18, color: AppTheme.inStock),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Llegó al almacén: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
-                    style: const TextStyle(fontSize: 14, color: AppTheme.textMedium, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              if (paquete.fechaEnvio != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.local_shipping_rounded, size: 18, color: AppTheme.sent),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Salió / Enviado: ${du.DateUtils.formatFull(paquete.fechaEnvio!)}',
-                      style: const TextStyle(fontSize: 14, color: AppTheme.textMedium, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+              if (paquete.detalle.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  paquete.detalle,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMedium),
                 ),
               ],
+              const SizedBox(height: 14),
+              // Fechas
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _fechaDetalle(
+                    Icons.inventory_2_rounded,
+                    'Llegó: ${du.DateUtils.formatFull(paquete.fechaLlegada)}',
+                    AppTheme.inStockLight,
+                    AppTheme.inStock,
+                  ),
+                  if (paquete.fechaEnvio != null)
+                    _fechaDetalle(
+                      Icons.local_shipping_rounded,
+                      'Salió: ${du.DateUtils.formatFull(paquete.fechaEnvio!)}',
+                      AppTheme.sentLight,
+                      AppTheme.sent,
+                    ),
+                ],
+              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cerrar'),
+                  child: const Text('Cerrar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _fechaDetalle(IconData icon, String text, Color bg, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
@@ -641,7 +715,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Fila superior: Código y Estado Explícito (En almacén vs Ya salió)
+              // Fila superior: Código y Estado
               Row(
                 children: [
                   Container(
@@ -651,7 +725,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      paquete.numero.startsWith('#') ? paquete.numero : '#${paquete.numero}',
+                      paquete.codigoVisible,
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -660,7 +734,6 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                     ),
                   ),
                   const Spacer(),
-                  // BADGE OBLIGATORIO: SALE SI ESTÁ EN ALMACÉN O ENVIADO
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
@@ -681,7 +754,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          yaEnviado ? 'YA SALIÓ / ENVIADO' : 'EN ALMACÉN',
+                          yaEnviado ? 'ENVIADO' : 'EN ALMACÉN',
                           style: TextStyle(
                             color: yaEnviado ? AppTheme.sent : AppTheme.inStock,
                             fontWeight: FontWeight.w900,
@@ -696,17 +769,26 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
 
-              // Descripción
+              // Para quién
               Text(
-                paquete.descripcion,
+                paquete.paraQuien.isEmpty ? 'Sin nombre' : paquete.paraQuien,
                 style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                   color: AppTheme.textDark,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (paquete.detalle.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  paquete.detalle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textMedium),
+                ),
+              ],
               const SizedBox(height: 10),
 
               // Fechas claras
@@ -726,7 +808,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                         const Icon(Icons.login_rounded, size: 13, color: AppTheme.inStock),
                         const SizedBox(width: 4),
                         Text(
-                          'Llegó: ${du.DateUtils.formatDate(paquete.fechaLlegada)}',
+                          'Llegó: ${du.DateUtils.formatDate(paquete.fechaLlegada)} (${du.DateUtils.formatTime(paquete.fechaLlegada)})',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.inStock,
@@ -749,7 +831,7 @@ class _TarjetaPaqueteCalendario extends ConsumerWidget {
                           const Icon(Icons.local_shipping_rounded, size: 13, color: AppTheme.sent),
                           const SizedBox(width: 4),
                           Text(
-                            'Salió: ${du.DateUtils.formatDate(paquete.fechaEnvio!)}',
+                            'Salió: ${du.DateUtils.formatDate(paquete.fechaEnvio!)} (${du.DateUtils.formatTime(paquete.fechaEnvio!)})',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.sent,

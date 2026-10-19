@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PaqueteListo usa la cámara para guardar una foto del paquete.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PaqueteListo usa tus fotos para adjuntar una imagen del paquete.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

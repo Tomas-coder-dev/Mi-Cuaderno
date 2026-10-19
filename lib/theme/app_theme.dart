@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ── Paleta Cálida Tipo Libreta Digital ───────────────────────
@@ -39,6 +38,7 @@ class AppTheme {
 
   static const Color danger = Color(0xFFDC2626);
   static const Color dangerLight = Color(0xFFFEE2E2);
+  static const Color dangerDark = Color(0xFF991B1B);
 
   static ThemeData get theme => ThemeData(
         useMaterial3: true,
@@ -51,47 +51,56 @@ class AppTheme {
           error: danger,
         ),
         scaffoldBackgroundColor: background,
-        textTheme: GoogleFonts.nunitoTextTheme().copyWith(
-          displayLarge: GoogleFonts.nunito(
+        fontFamily: 'Nunito',
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w900,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          displayMedium: GoogleFonts.nunito(
+          displayMedium: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          headlineLarge: GoogleFonts.nunito(
+          headlineLarge: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          headlineMedium: GoogleFonts.nunito(
+          headlineMedium: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          titleLarge: GoogleFonts.nunito(
+          titleLarge: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          bodyLarge: GoogleFonts.nunito(
+          bodyLarge: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w600,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
-          bodyMedium: GoogleFonts.nunito(
+          bodyMedium: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w500,
             color: textMedium,
+            fontFamily: 'Nunito',
           ),
-          labelLarge: GoogleFonts.nunito(
+          labelLarge: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
             color: Colors.white,
             letterSpacing: 0.3,
+            fontFamily: 'Nunito',
           ),
         ),
         appBarTheme: AppBarTheme(
@@ -99,10 +108,11 @@ class AppTheme {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           centerTitle: false,
-          titleTextStyle: GoogleFonts.nunito(
+          titleTextStyle: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w900,
             color: textDark,
+            fontFamily: 'Nunito',
           ),
           iconTheme: const IconThemeData(color: textDark, size: 26),
         ),
@@ -123,9 +133,10 @@ class AppTheme {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
-            textStyle: GoogleFonts.nunito(
+            textStyle: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
+              fontFamily: 'Nunito',
             ),
           ),
         ),
@@ -133,10 +144,11 @@ class AppTheme {
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          hintStyle: GoogleFonts.nunito(
+          hintStyle: const TextStyle(
             color: textLight,
             fontSize: 15,
             fontWeight: FontWeight.w500,
+            fontFamily: 'Nunito',
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
